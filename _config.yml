@@ -27,3 +27,5 @@ github_username:  hspazio
 # Build settings
 markdown: kramdown
 theme: minima
+
+permalink: pretty
