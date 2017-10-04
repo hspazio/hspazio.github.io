@@ -1,12 +1,13 @@
 title: Fabio Pitino
 email: pitinofabio@gmail.com
 description: > # this means to ignore newlines until "baseurl:"
-  Software developer and code crafter, whole life musician, beer lover. I build things in #Ruby. Explorer of #Elixir.
+  Software developer and code crafter, whole life musician, beer lover. I build things in #Ruby #JavaScript and #Go.
 baseurl: "" # the subpath of your site, e.g. /blog
 url: "https://hspazio.github.io"
 twitter_username: fabiopitino
 github_username:  hspazio
 
 markdown: kramdown
-theme: minima
+# theme: minima
+theme: tale
 permalink: pretty
