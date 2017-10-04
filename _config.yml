@@ -8,6 +8,6 @@ twitter_username: fabiopitino
 github_username:  hspazio
 
 markdown: kramdown
-# default >> theme: minima
-theme: tale
+# theme: minima
+theme: jekyll-theme-cayman
 permalink: pretty
