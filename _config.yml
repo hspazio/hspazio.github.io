@@ -1,0 +1,44 @@
+# Site settings
+title: 'Fabio Pitino'
+description: |
+  full stack software developer & code crafter, musician & food lover
+url: 'https://hspazio.github.io'
+baseurl: ''
+google_analytics: 'UA-82380905-1'
+disqus_shortname: 'hspazio-github-io'
+
+author:
+  name: 'Fabio Pitino'
+  email: pitinofabio@gmail.com
+  twitter_username: fabiopitino
+  facebook_username: fabio.pitino
+  github_username:  hspazio
+  linkedin_username: fabiopitino
+
+defaults:
+  -
+    scope:
+      path: ''
+      type: 'posts'
+    values:
+        layout: 'post'
+
+# Build settings
+destination: _site
+paginate: 10
+permalink: /:year/:title/
+markdown: kramdown
+highlighter: rouge
+
+sass:
+    sass_dir: _sass
+    style: compressed
+
+kramdown:
+  # use Github Flavored Markdown
+  input: GFM
+  # do not replace newlines by <br>s
+  hard_wrap: false
+
+plugins: ['jekyll-paginate']
+exclude: ['README.md', 'Gemfile', 'Gemfile.lock', 'screenshot.png']
