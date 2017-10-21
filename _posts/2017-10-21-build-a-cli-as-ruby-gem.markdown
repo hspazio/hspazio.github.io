@@ -8,7 +8,7 @@ comments: true
 
 Ruby is known for having a great ecosystem of code sharing within the community. Rubygems and Bundler have done an amazing job in simplifying this process and dependency management, even influencing modern package managers for other languages. 
 
-Every developer that is new to Ruby also knows how to `require` a file and/or an installed Gem. However, one of the most under estimated feature of a Ruby Gem is the capacity of running as a standalone command-line executable.
+Every developer that is new to Ruby also knows how to `require` a file and/or an installed Gem. However, one of the most under estimated features of a Ruby Gem is the capacity of running as a standalone command-line executable.
 
 Today we are going to build a simple weather CLI using plain Ruby with the help of [Bundler][bundler].
 The full project is also available on [GitHub][weather_repo].
@@ -19,7 +19,7 @@ First of all let's create a new Gem project boilerplate using Bundler
 bundle gem weather --test=minitest
 {% endhighlight %}
 
-## Custmize the gemspec
+## Customise the gemspec
 We need to make initial modifications to `weather.gemspec` file. First, editing any fields marked with a TODO.
 
 {% highlight ruby %}
@@ -33,7 +33,7 @@ Add the following line to define which file will be executed when we will invoke
 spec.default_executable = "weather"
 {% endhighlight %}
 
-Then will need to create the file `exe/weather`. You may need to first create the "exe" directory. We will fill the content of this file later.
+Then we will need to create the file `exe/weather`. You may need to first create the "exe" directory. We will fill the content of this file later.
 
 ## Set up the weather API account
 For this tutorial we are going to use [OpenWeatherMap API][weather_api_site] as they provide nice features with the free account. We need to register [here][weather_api_key] to get an app ID.
@@ -41,7 +41,7 @@ For this tutorial we are going to use [OpenWeatherMap API][weather_api_site] as 
 I've obtained an app ID and set it as environment variable `WEATHER_APP_ID` so that we don't commit it to the source control system. Hour gem is going to read it from the global `ENV` variable.
 
 ## Time to implement!
-Using Test-driven development we design our weather client. We start by designin a `Weather::Gateway` that we will use to encapsulate the details of the API provider, so that if we decide to user another provider, our changes are constrained within this class.
+Using Test-driven development we design our weather client. We start by designing a `Weather::Gateway` that we will use to encapsulate the details of the API provider, so that if we decide to user another provider, our changes are constrained within this class.
 
 {% highlight ruby %}
 require 'test_helper'
@@ -159,7 +159,7 @@ end
 {% endhighlight %}
 
 The first line (shebang) is crucial for the executable to work. It tells Rubygem how to run this executable and lets us not to worry about cross-platform compatibility.
-In fact, while on a Unix environment it's sufficient to have the shebang and executable permission on the file to run, when installing the gem on Windows, Rubygem will automatically create a `weather.bat` file that runs the `exe/wather.rb` file using the currently active Ruby installation. Neat, isn't it?
+In fact, while on a Unix environment it's sufficient to have the shebang and executable permission on the file to run, when installing the gem on Windows, Rubygem will automatically create a `weather.bat` file that runs the `exe/wather.rb` file using the currently active Ruby installation. Great, isn't it?
 
 Now we can finally build and install the Gem to see it working!
 {% highlight bash %}
@@ -214,7 +214,7 @@ weather Rome
 ## Conclusion
 In the past I've used libraries like [Ocra][ocra] to compile command-line tools from Ruby into executable Windows binaries. However things started to get complex after a while as we had to support a combination of Windows and Unix 32 and 64 bits executables. Unnecessary complexity started to appear considering that our team's primary focus was not to build command line tools.
 
-Ocra is a good solution if the users of your command line tool are not expected to have an installation of Ruby on their environment or if asking the users to install it as dependency is unacceptable. For the rest, building an executable gem is a great cheap, and more maintainable solution.
+Ocra is a good solution if the users of your command line tool are not expected to have an installation of Ruby on their environment or if asking the users to install it as dependency is unacceptable. For the rest, building an executable gem is a great, cheap and more maintainable solution.
 
 [bundler]: http://bundler.io
 [weather_api_site]: https://openweathermap.org
