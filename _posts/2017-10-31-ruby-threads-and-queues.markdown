@@ -45,7 +45,7 @@ Here we now have to implent the consumer which is going to pull the next job fro
 {% highlight ruby %}
 consumer = Thread.new do
   loop do
-    job = work.pop
+    job = work.deq
     puts "worker: #{job}"
 
     # some more long running job
@@ -54,23 +54,74 @@ consumer = Thread.new do
 end
 {% endhighlight %}
 
-When running our program we'll see that it's all working correctly except the fact that the process never ends - we will tackle this later on.
+Producer and consumer are not depending on each other. We could entirely redesign the consumer without impacting the producer and vice-versa. This because we have enstablished a communication protocol between the two components
+
+If we were to run our program right now we would see it exiting straight away despite having defined the two threads. This is because we havent told Ruby to start the threads. We do it by running the `Thread#join` method on each thread created.
 
 {% highlight ruby %}
-# with a sleep of 2 secs the consumer will never catch up with the workload
-# we can scale it up by adding another consumer
-# new_consumer = Thread.new do
-#   loop do
-#     message = work.pop
-#     break if message == :done
-#     puts "worker: #{message}"
-#     sleep 2 # simulate some work to do
-#   end
-# end
-# new_consumer.join
-
 producer.join
 consumer.join
 {% endhighlight %}
 
-Producer and consumer are not depending on each other. We could entirely redesign the consumer without impacting the producer and vice-versa. This because we have enstablished a communication protocol between the two components
+When running our program we'll see that it's all working correctly except the fact that the process never ends - we will tackle this later on.
+
+{% highlight bash %}
+queuing job 1
+consumer: job 1
+queuing job 2
+consumer: job 2
+queuing job 3
+queuing job 4
+consumer: job 3
+queuing job 5
+queuing job 6
+consumer: job 4
+queuing job 7
+queuing job 8
+consumer: job 5
+queuing job 9
+queuing job 10
+consumer: job 6
+{% endhighlight %}
+
+If you had notice from before, I've intentionally added `sleep 1` on the producer to simulate some work on its side and `sleep 2` on the consumer to simulate a long running job. In short I've made the consumer slower than the produer. Observing the output we can see that by the time we consumer processes job #6 the producer has already enqueued 10 jobs.
+
+On a production applicaton this would not be acceptable performance. But we do care about performance and we decide to deploy another consumer that pulls jobs from the same queue so that both consumers can keep up the pace with the producer.
+
+A quick fix is to duplicate the consumer block and assign it to a new variable. This code is not clean but we'll improve it later. For now 'done' is better than 'good'.
+We modify a little the consumer block to be an array of threads and now we also have a variable that we can control to scale up/down the number of consumers.
+
+{% highlight ruby %}
+num_consumers = 2
+
+consumers = Array.new(num_consumers) do |n|
+  Thread.new do
+    loop do
+      job = work.deq
+      puts "consumer #{n}: #{job}"
+      sleep 2  # simulate some work to do
+    end
+  end
+end
+
+consumers.map(&:join)
+{% endhighlight %}
+
+Running the script now we notice that produer and consumers are running all at the same pace because one consumer is picking up a new job while the other one is still processing the previous job.
+
+{% highlight bash %}
+queuing job 1
+consumer 1: job 1
+queuing job 2
+consumer 0: job 2
+queuing job 3
+consumer 1: job 3
+queuing job 4
+consumer 0: job 4
+queuing job 5
+consumer 1: job 5
+queuing job 6
+consumer 0: job 6
+queuing job 7
+consumer 1: job 7
+{% endhighlight %}
