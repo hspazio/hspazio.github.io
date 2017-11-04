@@ -88,7 +88,6 @@ If you had notice from before, I've intentionally added `sleep 1` on the produce
 
 On a production applicaton this would not be acceptable performance. But we do care about performance and we decide to deploy another consumer that pulls jobs from the same queue so that both consumers can keep up the pace with the producer.
 
-A quick fix is to duplicate the consumer block and assign it to a new variable. This code is not clean but we'll improve it later. For now 'done' is better than 'good'.
 We modify a little the consumer block to be an array of threads and now we also have a variable that we can control to scale up/down the number of consumers.
 
 {% highlight ruby %}
@@ -125,3 +124,69 @@ consumer 0: job 6
 queuing job 7
 consumer 1: job 7
 {% endhighlight %}
+
+For now our program will run forever. If we were to test this program we would probably have the producer queuing a number of jobs and we would assert that the consumer handles them. 
+
+Lets modify the producer to only queue a finite number of jobs.
+
+{% highlight ruby %}
+producer = Thread.new do
+  5.times do |n|
+    puts "queuing job #{n}"
+    work << "job #{n}"
+    sleep 1
+  end
+end
+{% endhighlight %}
+
+If we run the program we see the consumers pulling jobs but then an unusual error occurs:
+
+{% highlight bash %}
+queuing job 0
+consumer 0: job 0
+queuing job 1
+consumer 1: job 1
+queuing job 2
+consumer 0: job 2
+queuing job 3
+consumer 1: job 3
+queuing job 4
+consumer 0: job 4
+finite_producer_consumer.rb:25:in `join': No live threads left. Deadlock? (fatal)`
+{% endhighlight %}
+
+What is this error about?
+
+The ruby runtime realized that there are 2 other threads ready to pull from the queue (and in waiting state) but no other thread will enqueue new jobs because the consumer thread exited after queuing 5 jobs.
+
+What we need is a mechanism to tell the consumers that no further jobs will be enqueued and that they can safely exit. We can enqueue a `:done` symbol as a signal to exit for the consumer that will pull it. As we have 2 consumers we do it twice.
+
+{% highlight ruby %}
+producer = Thread.new do
+  5.times do |n|
+    puts "queuing job #{n}"
+    work << "job #{n}"
+    sleep 1
+  end
+
+  # line added
+  num_consumers.times { work << :done }
+end
+{% endhighlight %}
+
+On the consumer side we have to check whether the job is the special case `:done` and interrupt the loop if so.
+
+{% highlight ruby %}
+consumers = Array.new(num_consumers) do |n|
+  Thread.new do
+    loop do
+      job = work.pop
+      break if job == :done  # line added
+      puts "consumer #{n}: #{job}"
+      sleep 2  # simulate some work to do
+    end
+  end
+end
+{% endhighlight %}
+
+With this small change our script is now able to exit graceully because there are no more threads hanging around.
