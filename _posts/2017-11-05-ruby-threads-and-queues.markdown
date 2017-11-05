@@ -1,7 +1,7 @@
 ---
 layout: post
 title: "Ruby threads and queues"
-date: 2017-10-28 
+date: 2017-11-05
 tags: [ruby, concurrency]
 comments: true
 ---
@@ -10,18 +10,20 @@ Lately I've been working on scaling up the algorithm of a Master-Slave architect
 
 Ruby has concurrency primitives built in its standard library. Today we start with the fundamental blocks and we will move to more complex patterns later on.
 
-To access to these building blocks we need to first require the `thread` library. This will let us use the `Thread` and `Queue` objects as well as many others that we will see later on.
+To access these building blocks we need to first require the `thread` library. This will let us use the `Thread` and `Queue` objects as well as many others that we will see in other posts.
 
-First we start with a simple design where a producer queues jobs for a consumer. The producer could be a web server queuing email notifications to be sent out, a main thread in a crawler that queues urls to downloader components (consumer)... the list could be long.
+Today we start with a simple design where a producer queues jobs for a consumer to process them. The producer could be a web server queuing email notifications to be sent out, a main thread in a crawler that queues urls to downloader components... the list could be long.
 
-The first tool we are going to need is a queue. 
+The first tool we are going to need is a queue. A queue is thread-safe which means we can build a lot of concurrency patterns with just that.
 {% highlight ruby %}
 require 'thread'
 
 work = Queue.new
 {% endhighlight %}
 
-We will use this queue to communicate between the producer and the consumer. Then we can flesh out a basic consumer which will run in a loop, will produce some jobs and will push them on to the queue we just created. 
+We will use this queue to communicate between the producer and the consumer. 
+
+Then we can flesh out a basic consumer which will run in a loop, will produce some jobs and will push them on to the queue we just created. 
 
 {% highlight ruby %}
 producer = Thread.new do
@@ -35,9 +37,9 @@ producer = Thread.new do
 end
 {% endhighlight %}
 
-We implement the producer as a thread so that we can move the control to the next block.
+We implement the producer as a thread so that we can move the control of the program to the next block.
 
-`Queue` has plenty of aliases for inserting and removing items: here we just used `<<` for insert but we could have used `enq` or `push`. Similarly, for removing items we can use `shift`, `deq` or `pop`. As of writing this post I personally prefer the `<<` operator for inserting as it's graphically expressive, and `deq` for dequeuing. I personally consider `enq` and `deq` very similar in appearance to be used together and `push` and `pop` a bit misleading as highly used for stack behavior.
+`Queue` has plenty of aliases for inserting and removing items: here we just used `<<` for insert but we could have used `enq` or `push`. Similarly, for removing items we can use `shift`, `deq` or `pop`. As of writing this post I personally prefer the `<<` operator for inserting messages as it's graphically expressive, then either `pop` or `deq` for pulling from the queue. In my opinion `enq` and `deq` are very similar in appearance to be used together (I generally prefer to use different looking terms to amplify the constrast) and `push` and `pop` are a bit misleading as highly used for stack behavior Last-In-First-Out.
 
 Let's continue our journey towards the consumer side.
 Here we now have to implent the consumer which is going to pull the next job from the queue and do some work with it.
@@ -86,7 +88,7 @@ consumer: job 6
 
 If you had notice from before, I've intentionally added `sleep 1` on the producer to simulate some work on its side and `sleep 2` on the consumer to simulate a long running job. In short I've made the consumer slower than the produer. Observing the output we can see that by the time we consumer processes job #6 the producer has already enqueued 10 jobs.
 
-On a production applicaton this would not be acceptable performance. But we do care about performance and we decide to deploy another consumer that pulls jobs from the same queue so that both consumers can keep up the pace with the producer.
+If the produer creates constantly jobs at such pace the consumer would never be able to catch up. On a production applicaton this would not be acceptable. But we do care about performance and so we decide to deploy another consumer that pulls jobs from the same queue so that both consumers can keep up the pace with the producer.
 
 We modify a little the consumer block to be an array of threads and now we also have a variable that we can control to scale up/down the number of consumers.
 
@@ -155,11 +157,13 @@ consumer 0: job 4
 finite_producer_consumer.rb:25:in `join': No live threads left. Deadlock? (fatal)`
 {% endhighlight %}
 
-What is this error about?
+### What is this error about?
 
 The ruby runtime realized that there are 2 other threads ready to pull from the queue (and in waiting state) but no other thread will enqueue new jobs because the consumer thread exited after queuing 5 jobs.
 
-What we need is a mechanism to tell the consumers that no further jobs will be enqueued and that they can safely exit. We can enqueue a `:done` symbol as a signal to exit for the consumer that will pull it. As we have 2 consumers we do it twice.
+What we need is a mechanism to tell the consumers that no further jobs will be enqueued and that they can safely exit. 
+
+We can enqueue a `:done` symbol as a signal for the consumer that will read it. As we have 2 consumers we do it twice.
 
 {% highlight ruby %}
 producer = Thread.new do
@@ -183,10 +187,12 @@ consumers = Array.new(num_consumers) do |n|
       job = work.pop
       break if job == :done  # line added
       puts "consumer #{n}: #{job}"
-      sleep 2  # simulate some work to do
+      sleep 2
     end
   end
 end
 {% endhighlight %}
 
 With this small change our script is now able to exit graceully because there are no more threads hanging around.
+
+Regardless whether we have a producer that enqueues a finite number of messages or that runs in a loops and produces messages forever, having an exit strategy for the consumers is always a good practice. For example we could catch the `Ctrl-C` signal and instead of exit immediately we could notify the consumers that we are closing the queue and no more work will be added, then do any teardown or cleanup to exit gracefully.
