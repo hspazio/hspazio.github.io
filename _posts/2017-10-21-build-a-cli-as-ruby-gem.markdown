@@ -2,7 +2,7 @@
 layout: post
 title: "Build a CLI as Ruby Gem"
 date: 2017-10-16 18:23:32
-tags: [ruby]
+tags: [ruby, cli]
 comments: true
 ---
 
