@@ -8,6 +8,8 @@ comments: true
 
 Lately I've been working on scaling up the algorithm of a Master-Slave architecture and given the amount of patterns I'm using I figured I'd write a series of blog posts on Ruby concurrency and its patterns.
 
+![Ruby threads and queues](/images/ruby-threads-and-queues.jpg){:class="img-responsive"}
+
 Ruby has concurrency primitives built in its standard library. Today we start with the fundamental blocks and we will move to more complex patterns later on. The Ruby `thread` standard library contains the `Thread` and `Queue` objects as well as many others that we will see in other posts.
 
 Today we start with a simple design where a producer queues jobs to be processed by a consumer. The producer could be a web server queuing email notifications to be sent out, a main thread in a crawler that queues urls to downloader components... the list could be long.
