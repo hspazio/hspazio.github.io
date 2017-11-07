@@ -8,6 +8,8 @@ comments: true
 
 Lately I've been working on scaling up the algorithm of a Master-Slave architecture and given the amount of patterns I'm using I figured I'd write a series of blog posts on Ruby concurrency and its patterns.
 
+![Ruby threads and queues](/images/ruby-threads-and-queues.jpg){:class="img-responsive"}
+
 Ruby has concurrency primitives built in its standard library. Today we start with the fundamental blocks and we will move to more complex patterns later on.
 
 To access these building blocks we need to first require the `thread` library. This will let us use the `Thread` and `Queue` objects as well as many others that we will see in other posts.
