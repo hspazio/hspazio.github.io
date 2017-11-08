@@ -1,6 +1,6 @@
 ---
 layout: post
-title: "Ruby concurrency patterns: worker pool"
+title: "Worker pool from scratch"
 date: 2017-11-06
 tags: [ruby, concurrency]
 comments: true
@@ -54,7 +54,7 @@ We have successfully queued jobs to the worker but lets write another test to de
 
 For simplicity we could have a worker that expects jobs to be any __callable__ object. For callable object we intend any object that implements the `call` method. In our case we can enqueue lambdas which is a perfectly legit callable object.
 
-To ensure that the jobs have been executed we can collect the results in an array to be inspected during the assertions. Also, as we saw in the [previous post][threads_and_queues], we need to tell the worker when to stop waiting for jobs. We will enqueue the symbol `:done` and we will adding an exit condition.
+To ensure that the jobs have been executed we can collect the results in an array to be inspected during the assertions. Also, as we saw in the [previous post][threads_and_queues], we need to tell the worker when to stop waiting for jobs. We will enqueue the symbol `:done` and we will add an exit condition.
 
 {% highlight ruby %}
 describe Worker do
