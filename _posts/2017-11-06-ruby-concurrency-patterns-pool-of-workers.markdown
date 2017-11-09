@@ -65,8 +65,8 @@ describe Worker do
     results = []
 
     Thread.new do
-      worker << -> { results << 'received job 1' }
-      worker << -> { results << 'received job 2' }
+      worker << ->{ results.push('received job 1') }
+      worker << ->{ results.push('received job 2') }
       worker << :done
     end
 
@@ -94,6 +94,27 @@ class Worker
       break if job == :done
       job.call
     end
+  end
+end
+{% endhighlight %}
+
+Now we can move up the abstraction layers and assemble multiple workers together. The Worker Pool will be a thin layer over an array of workers.
+
+As usual we start by writing the tests.
+
+{% highlight ruby %}
+describe WorkerPool do
+  it 'has an initial empty state' do
+    pool = WorkerPool.new(5) 
+    assert_equal 0, pool.jobs_count
+  end
+end
+{% endhighlight %}
+
+{% highlight ruby %}
+class WorkerPool
+  def initialize(num_workers)
+    @workers = Array.new(num_workers) { |n| Worker.new("worker_#{n}") }
   end
 end
 {% endhighlight %}
