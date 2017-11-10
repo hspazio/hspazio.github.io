@@ -84,13 +84,13 @@ class Worker
   # previous implementation...
 
   def run
-    Thread.new { perform_async }.join
+    Thread.new { perform }.join
   end
 
   private
 
-  def perform_async
-    while job = @queue.pop do
+  def perform
+    while (job = @queue.pop)
       break if job == :done
       job.call
     end
@@ -104,9 +104,10 @@ As usual we start by writing the tests.
 
 {% highlight ruby %}
 describe WorkerPool do
-  it 'has an initial empty state' do
-    pool = WorkerPool.new(5) 
-    assert_equal 0, pool.jobs_count
+  it 'has an initial empty status showing the distrubution of the jobs' do
+    pool = WorkerPool.new(4) 
+
+    assert_equal [0, 0, 0, 0], pool.status
   end
 end
 {% endhighlight %}
@@ -116,7 +117,54 @@ class WorkerPool
   def initialize(num_workers)
     @workers = Array.new(num_workers) { |n| Worker.new("worker_#{n}") }
   end
+
+  def status
+    @workers.map(&:jobs_count)
+  end
 end
 {% endhighlight %}
+
+{% highlight ruby %}
+describe WorkerPool do
+  # previous tests...
+
+  it 'distributes the work using the default Round Robin strategy' do
+    pool = WorkerPool.new(4)
+
+    pool << :job
+    assert_equal [1, 0, 0, 0], pool.status
+
+    pool << :job
+    assert_equal [1, 1, 0, 0], pool.status
+
+    pool << :job
+    assert_equal [1, 1, 1, 0], pool.status
+
+    pool << :job
+    assert_equal [1, 1, 1, 1], pool.status
+
+    pool << :job
+    assert_equal [2, 1, 1, 1], pool.status
+  end
+end
+{% endhighlight %}
+
+{% highlight ruby %}
+class WorkerPool
+  def initialize(num_workers)
+    @workers = Array.new(num_workers) { |n| Worker.new("worker_#{n}") }
+    # line below added: we define an enumerator that cycles through the workers
+    @current_worker = @workers.cycle  
+  end
+
+  # ...
+
+  def <<(job)
+    @current_worker.next << job
+  end
+end
+{% endhighlight %}
+
+Now the hard part! let's test that the workers run and perform the jobs as expected.
 
 [threads_and_queues]: /2017/ruby-threads-and-queues
