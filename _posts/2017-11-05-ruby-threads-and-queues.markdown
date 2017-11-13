@@ -8,11 +8,11 @@ comments: true
 
 Lately I've been working on scaling up the algorithm of a Master-Slave architecture and given the amount of patterns I'm using I figured I'd write a series of blog posts on Ruby concurrency and its patterns.
 
-Ruby has concurrency primitives built in its standard library. Today we start with the fundamental blocks and we will move to more complex patterns later on.
+![Ruby threads and queues](/images/ruby-threads-and-queues.jpg){:class="img-responsive"}
 
-To access these building blocks we need to first require the `thread` library. This will let us use the `Thread` and `Queue` objects as well as many others that we will see in other posts.
+Ruby has concurrency primitives built in its standard library. Today we start with the fundamental blocks and we will move to more complex patterns later on. The Ruby `thread` standard library contains the `Thread` and `Queue` objects as well as many others that we will see in other posts.
 
-Today we start with a simple design where a producer queues jobs for a consumer to process them. The producer could be a web server queuing email notifications to be sent out, a main thread in a crawler that queues urls to downloader components... the list could be long.
+Today we start with a simple design where a producer queues jobs to be processed by a consumer. The producer could be a web server queuing email notifications to be sent out, a main thread in a crawler that queues urls to downloader components... the list could be long.
 
 The first tool we are going to need is a queue. A queue is thread-safe which means we can build a lot of concurrency patterns with just that.
 {% highlight ruby %}
@@ -23,7 +23,7 @@ work = Queue.new
 
 We will use this queue to communicate between the producer and the consumer. 
 
-Then we can flesh out a basic consumer which will run in a loop, will produce some jobs and will push them on to the queue we just created. 
+Then we can flesh out a basic producer which will run in a loop, will produce some jobs and will push them on to the queue we just created. 
 
 {% highlight ruby %}
 producer = Thread.new do
@@ -56,9 +56,10 @@ consumer = Thread.new do
 end
 {% endhighlight %}
 
-Producer and consumer are not depending on each other. We could entirely redesign the consumer without impacting the producer and vice-versa. This because we have enstablished a communication protocol between the two components
+Producer and consumer are not depending on each other. We could entirely redesign the consumer without impacting the producer and vice-versa. This because we have enstablished a communication protocol between the two components.
 
-If we were to run our program right now we would see it exiting straight away despite having defined the two threads. This is because we havent told Ruby to start the threads. We do it by running the `Thread#join` method on each thread created.
+If we were to run our program right now we would see it exiting straight away despite having defined the two threads. This is because we havent told the main thread to wait for the other threads to finish. 
+This has a similar effect to running a Unix command with `&` at the end, which will run the command in the background. We'll fix it by running the `Thread#join` method on each thread created.
 
 {% highlight ruby %}
 producer.join
@@ -90,7 +91,7 @@ If you had notice from before, I've intentionally added `sleep 1` on the produce
 
 If the produer creates constantly jobs at such pace the consumer would never be able to catch up. On a production applicaton this would not be acceptable. But we do care about performance and so we decide to deploy another consumer that pulls jobs from the same queue so that both consumers can keep up the pace with the producer.
 
-We modify a little the consumer block to be an array of threads and now we also have a variable that we can control to scale up/down the number of consumers.
+We modify a little the consumer block to be an array of threads. A nice side effect is that we also have a variable that we can control to scale up/down the number of consumers.
 
 {% highlight ruby %}
 num_consumers = 2
@@ -127,7 +128,9 @@ queuing job 7
 consumer 1: job 7
 {% endhighlight %}
 
-For now our program will run forever. If we were to test this program we would probably have the producer queuing a number of jobs and we would assert that the consumer handles them. 
+## Exit strategy
+
+For now our program will run forever and that's not a reasonable thing to test. If we were to write tests for this program we would probably have the producer queuing a finite number of jobs and then we would assert that the consumer handles them.
 
 Lets modify the producer to only queue a finite number of jobs.
 
@@ -159,7 +162,7 @@ finite_producer_consumer.rb:25:in `join': No live threads left. Deadlock? (fatal
 
 ### What is this error about?
 
-The ruby runtime realized that there are 2 other threads ready to pull from the queue (and in waiting state) but no other thread will enqueue new jobs because the consumer thread exited after queuing 5 jobs.
+The Ruby runtime realized that there are 2 other threads ready to pull from the queue (and in waiting state) but no other thread will enqueue new jobs because the consumer thread exited after queuing 5 jobs.
 
 What we need is a mechanism to tell the consumers that no further jobs will be enqueued and that they can safely exit. 
 
