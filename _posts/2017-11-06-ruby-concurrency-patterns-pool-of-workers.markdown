@@ -218,19 +218,35 @@ The WorkerPool code will then need to be changed by initializing workers without
 2. It chooses which workers to assign the job to according to the scheduling algorithm
 3. It closes the pool by pushing the `:done` signal to each workers
 
+Given that we want to implement different scheduling algorithms we could isolate the scheduler's responsibility from the WorkerPool by creating a new Scheduler class that the WorkerPool will delegate to for dispatching the jobs. We'll use composition!
+
+{% highlight ruby %}
+class LeastBusyFirstScheduler
+  def initialize(workers)
+    @workers = workers
+  end
+
+  def schedule(job)
+    worker = @workers.sort_by(&:jobs_count).first
+    worker << job
+  end
+end
+{% endhighlight %}
+
+That's it for this scheduler. A small single responsibility!
+
 {% highlight ruby %}
 class WorkerPool
-  def initialize(num_workers)
+  def initialize(num_workers, scheduler_factory)
     @workers = Array.new(num_workers) { |n| Worker.new("worker_#{n}") }
+    @scheduler = scheduler_factory.new(@workers)
   end
 
   def <<(job)
     if job == :done
       @workers.map { |w| w << :done }
     else
-      # scheduling algorithm
-      worker = @workers.sort_by(&:jobs_count).first
-      worker << job
+      @scheduler.schedule(job)
     end
   end
 
@@ -238,5 +254,48 @@ class WorkerPool
 end
 {% endhighlight %}
 
+There you have! A pool of workers that schedules jobs to the least busy worker.
+
+## Round-Robin
+
+Now that we have laid the ground work for the WorkerPool to be composed up we can define a new Scheduler that uses the Round-Robin algorithm.
+
+{% highlight ruby %}
+class RoundRobinScheduler
+  def initialize(workers)
+    @current_worker = workers.cycle
+  end
+
+  def schedule(job)
+    @current_worker.next << job
+  end
+end
+{% endhighlight %}
+
+Notice that differetly than the `LestBusyFirstScheduler`, here we don't need to point to the whole array of workers. We can use the Enumerable#cycle method (with link to doc) which generates an Enumerator that, as the name says, cycles through the element of the array and restarts when it reaches the end.
+
+## Topic Scheduler
+
+Imagine like on a Pub-Sub system we have workers can only perform jobs with a specific tag. This concept is implemented in RabbitMQ Topic Exchange.
+
+{% highlight ruby %}
+class TopicScheduler
+  TOPICS = [:service_1, :service_2, :service_3]
+
+  def initialize(workers)
+    @workers = {}
+    workers_per_topic = workers / TOPICS.size
+    workers.each_slice(workers_per_topic).each_with_index do |slice, index|
+      topic = TOPICS[index]
+      @workers[topic] = slice
+    end
+  end
+
+  def schedule(job)
+    worker = @workers[job.topic].sort_by(&:jobs_count).first
+    worker << job
+  end
+end
+{% endhighlight %}
 
 [threads_and_queues]: /2017/ruby-threads-and-queues
