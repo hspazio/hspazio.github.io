@@ -1,16 +1,27 @@
 ---
 layout: post
-title: "Worker pool from scratch"
-date: 2017-11-06
+title: "Implementing a worker pool"
+date: 2017-11-13
 tags: [ruby, concurrency]
 comments: true
 ---
 
-We start with defining one of the smallest unit: the Worker
+Often in time when you need to execute multiple tasks it pays off running them in parallel, especially when they involve blocking I/O operations and CPU computations.
+It may not always be possible to spawn as many threads as the number of tasks, think about the maximum number of connections allowed to a database server or threads that could use large chunk of memory. 
 
-For simplicity we could have a worker that expects jobs to be any __callable__ object. For callable object we intend any object that implements the `call` method. In our case we can enqueue lambdas which is a perfectly legit callable object.
+In order to improve performance of an application without sacrificing tonnes of resources the Worker Pool is a simple and efficient solution that powers many concurrency patterns.
 
-To ensure that the jobs have been executed we can collect the results in an array to be inspected during the assertions. Also, as we saw in the [previous post][threads_and_queues], we need to tell the worker when to stop waiting for jobs. We will enqueue the symbol `:done` and we will add an exit condition.
+There are a lot of opensource projects that implement this pattern, [Celluloid][celluloid] and [Concurrent Ruby][concurrent_ruby] are the most popular and better maintained ones. But I thought it would be fun to implement one from scratch in order to better understand the dynamics of this pattern.
+
+## The unit: the worker
+
+A worker is simply a component that pulls work to do from a queue and fulfills it.
+
+The work to be fulfilled could be anything, a `Job` class with a `perform` method - like the popular Delayed Job library - a Ruby block or any arbitrary object. For simplicity here we implement a worker that expects jobs to be any __callable__ object. For callable object we intend any object that implements the `call` method. In our case we can enqueue lambdas which are a perfectly legit callable objects.
+
+We start, using TDD, to define how we would like the worker to behave. When creating multiple workers it could be a good idea to define a `name` or `ID` attribute. It will easy debugging.
+
+Then the obvious feature: as we queue jobs we expect them to be performed by the worker. To ensure that the jobs have been executed we can collect the results in an array to be inspected during the assertions. Also, as we saw in the [previous post][threads_and_queues], we need to tell the worker when to stop waiting for jobs. We will enqueue the symbol `:done` and we will add an exit condition.
 
 {% highlight ruby %}
 require 'minitest/autorun'
@@ -40,7 +51,7 @@ describe Worker do
 end
 {% endhighlight %}
 
-Then with the following implementation we satisfy the tests. 
+To satisfy the tests we create a `Worker` class that accepts a name and a queue to listen for jobs. Also, as we initialize the object we run it straight away so it starts to listen to jobs. This part is important when we have multiple workers sharing the same queue as if we start all the workers at once while the queue has already been populated we don't guarantee randomization for the jobs scheduling. This is one of the first caveats of building a worker pool. Make sure the workers are running before queuing the jobs.
 
 {% highlight ruby %}
 class Worker
@@ -62,7 +73,7 @@ class Worker
     while (job = @queue.pop)
       break if job == :done
       job.call
-      puts "#{name} got #{job}"
+      puts "#{name} got #{job}" # only for debugging
     end
   end
 end
@@ -70,11 +81,11 @@ end
 
 When we initialize the Worker it creates a new Thread that iterates and through the queue and executes each job until it meets the exit condition. Then, with the `join` method we wait for the Worker to complete.
 
-We have successfully queued jobs to the worker but lets write another test to describe how to handle jobs from the queue.
+## Managing workers: the worker pool
 
-Now we can move up the abstraction layers and assemble multiple workers together. The Worker Pool will be a thin layer over an array of workers.
+Now we can move up the abstraction ladder and assemble multiple workers together that share the same queue. The worker pool can be a very thin layer on top of an array of workers.
 
-As usual we start by writing the tests. We will calculate the Fibonacci sequence (link to wikipedia) by delegating the calculations to a Worker Pool.
+As usual we start by writing the tests first. We'll use the [Fibonacci sequence][fibonacci_wikipedia] so we can let the worker pool churning the calculations.
 
 {% highlight ruby %}
 describe WorkerPool do
@@ -103,7 +114,9 @@ describe WorkerPool do
 end
 {% endhighlight %}
 
-Where we define `fib` as:
+In the test above we defined a `WorkerPool` that initializes 10 workers and we queued 30 lambas to it. Once each lamba is executed by a worker it pushes the result of `fib` to a Hash which is asserted at the end. Then we tell the pool that no more work will be queued and we wait for the workers to fully process the queue.
+
+And for the sake of completeness we define `fib` as below:
 
 {% highlight ruby %}
 def fib(n)
@@ -111,7 +124,7 @@ def fib(n)
 end
 {% endhighlight %}
 
-Describe the test code here...
+Now we can satisfy the test. Notice the method `<<`, as we signal that no more jobs are queued, the WorkerPool in turn will signal each worker. Otherwise, a job is put into the queue.
 
 {% highlight ruby %}
 class WorkerPool
@@ -136,7 +149,7 @@ class WorkerPool
 end
 {% endhighlight %}
 
-When running the tests we can see that they are all passing but especially that the system schedules the threads without any particular order. So, it is not guaranteed that `worker_0` will pick the first job.
+When running the tests we can see that they are all passing and the system schedules the threads without any particular order. So, it is not guaranteed that `worker_0` will take the first job.
 
 {% highlight ruby %}
 worker_1 got #<Proc:0x007fc35a132d18@worker_pool_2.rb:40 (lambda)>
@@ -156,7 +169,9 @@ worker_4 got #<Proc:0x007fc35a1304f0@worker_pool_2.rb:89 (lambda)>
 worker_0 got #<Proc:0x007fc35a1306f8@worker_pool_2.rb:89 (lambda)>
 {% endhighlight %}
 
-## Improvements
+That's really it! This is a simple and at the same time flexible implementation that can help you boost parts of the code base that perform large I/O operations.
+
+## Further improvements
 
 The implementation of the WorkerPool above has a slight bug. If we have a producer that will continuously create jobs and running the jobs is a much slower process that creating them we would have made the Workers be the bottleneck with the risk that they would not be able to catch up. On production more and more jobs would be pushed to the queue until the interpreter runs out of memory.
 
@@ -299,3 +314,6 @@ end
 {% endhighlight %}
 
 [threads_and_queues]: /2017/ruby-threads-and-queues
+[celluloid]: https://github.com/celluloid/celluloid
+[concurrent_ruby]: https://github.com/ruby-concurrency/concurrent-ruby
+[fibonacci_wikipedia]: https://en.wikipedia.org/wiki/Fibonacci_number
