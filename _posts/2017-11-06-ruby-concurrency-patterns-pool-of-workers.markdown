@@ -173,13 +173,13 @@ That's really it! This is a simple and at the same time flexible implementation 
 
 ## Further improvements
 
-The implementation of the WorkerPool above has a slight bug. If we have a producer that will continuously create jobs and running the jobs is a much slower process that creating them we would have made the Workers be the bottleneck with the risk that they would not be able to catch up. On production more and more jobs would be pushed to the queue until the interpreter runs out of memory.
+The implementation of the WorkerPool above has a slight bug. If the producer creates jobs much faster than the workers to process them we could risk that more and more jobs would be pushed to the queue until the program runs out of memory.
 
-We could fix this by limiting the number of jobs that the queue can hold. Enter the __SizedQueue__.
+We could fix this by limiting the number of jobs that the queue can hold. Enter the __SizedQueue__!
 
-The SizedQueue is initialized with an Integer that represents the max number of items that it can contain. When the max is reached, the statement that pushes jobs to the queue is paused until an item is pulled from the queue. At this point the queue wakes up the previously paused statement.
+The SizedQueue is initialized with an Integer that represents the max number of items it can contain. When the max is reached, the statement that pushes jobs to the queue is paused until an item is pulled from the queue. At this point the queue wakes up the previously paused statement.
 
-We can now edit the `WorkerPool` initializer by limiting the number of items in the queue to the number of workers available. We could limit it to any arbitrary number. This way we ensure that producer and consmer maintain the same pace. The WorkerPool, in fact, will act as a traffic light: if there are too many jobs it will temporary block any threads that push onto the queue until there is space available again.
+We can now edit the `WorkerPool` initializer by limiting the number of items in the queue to the number of workers available. We could limit it to any arbitrary number. This way we ensure that producer and worker pool as a whole maintain the same pace. The WorkerPool, in fact, will act as a traffic light: if there are too many jobs it will temporary block any threads that push onto the queue until there is space available again.
 
 {% highlight ruby %}
 class WorkerPool
@@ -194,17 +194,17 @@ class WorkerPool
 end
 {% endhighlight %}
 
-## Implement scheduling algorithms
+## Playing with scheduling algorithms
 
-An alternative approach could be having the WorkerPool playing a more active role by being responsible for the scheduling. This means that instead having all workers pulling from the same queue, eqch worker will have its own queue. This approach could be useful if you want to segregate the workers by responsibility - for example mailer workers, file download workers, database workers, etc.
+So far our WorkerPool has been delegating most of the responsibility to the internal queue. An alternative approach could be having the WorkerPool playing a more active role by being responsible for the scheduling. This means that instead having all workers pulling from the same queue, each worker will have its own queue. 
 
 In this section we are going to explore some variations to solve different problems.
 
 ### Least-Busy First
 
-We modify the previous Worker implementatin by dropping the `queue` argument in the initializer and instead having the Worker defining a queue internally. This new dedicated queue will be the "inbox" of the Worker. 
+We modify the previous Worker implementatin by dropping the `queue` argument in the initializer and instead we have the Worker defining a queue internally. This new dedicated queue will be the "inbox" of the Worker. 
 
-Now we need to allow the Worker to receive jobs from the outside. We define a `<<` operator that delegates to the inbox queue and a `jobs_count` to allow the WorkerPool inspect the load of each worker and schedule jobs by consequence.
+Now we need to allow the Worker to receive jobs from the outside - remember previously the worker was pulling from a shared queue. We define a `<<` method that delegates to the inbox queue and a `jobs_count` to let the WorkerPool inspect the load of each worker and schedule jobs by consequence.
 
 {% highlight ruby %}
 class Worker
@@ -228,11 +228,7 @@ class Worker
 end
 {% endhighlight %}
 
-The WorkerPool code will then need to be changed by initializing workers without passing in the shared queue. Also the `<<` method needs to be rewritten because:
-1. It does not push to the shared queue
-2. It chooses which workers to assign the job to according to the scheduling algorithm
-3. It closes the pool by pushing the `:done` signal to each workers
-
+The WorkerPool code will then need to be changed by initializing workers without passing in the shared queue.
 Given that we want to implement different scheduling algorithms we could isolate the scheduler's responsibility from the WorkerPool by creating a new Scheduler class that the WorkerPool will delegate to for dispatching the jobs. We'll use composition!
 
 {% highlight ruby %}
@@ -248,7 +244,9 @@ class LeastBusyFirstScheduler
 end
 {% endhighlight %}
 
-That's it for this scheduler. A small single responsibility!
+That's it for this scheduler. A nice, small and single responsibility!
+
+We only need to inject it to the WorkerPool constructor so that we can easily switch strategy if we want to. Notice that as the WorkerPool creates the array of workers we can pass in a factory object (just the class in this case) that will be used to initialize the concrete scheduler.
 
 {% highlight ruby %}
 class WorkerPool
@@ -271,7 +269,7 @@ end
 
 There you have! A pool of workers that schedules jobs to the least busy worker.
 
-## Round-Robin
+### Round-Robin
 
 Now that we have laid the ground work for the WorkerPool to be composed up we can define a new Scheduler that uses the Round-Robin algorithm.
 
@@ -287,11 +285,12 @@ class RoundRobinScheduler
 end
 {% endhighlight %}
 
-Notice that differetly than the `LestBusyFirstScheduler`, here we don't need to point to the whole array of workers. We can use the Enumerable#cycle method (with link to doc) which generates an Enumerator that, as the name says, cycles through the element of the array and restarts when it reaches the end.
+Notice that differetly than the `LestBusyFirstScheduler`, here we don't need to point to the whole array of workers. We can use the [Enumerable#cycle][enumerable_cycle] method which generates an Enumerator that cycles through the elements of the array and restarts when it reaches the end.
 
-## Topic Scheduler
+### Topic Scheduler
 
-Imagine like on a Pub-Sub system we have workers can only perform jobs with a specific tag. This concept is implemented in RabbitMQ Topic Exchange.
+Imagine like on a Pub-Sub system we have workers can only perform jobs with a specific tag. This concept is a simplified version of the [Topic Exchange][topic_exchange_rabbitmq] in RabbitMQ.
+This type of scheduler could be useful if you want to segregate the workers by responsibility - for example mailer workers, file download workers, database workers, etc.
 
 {% highlight ruby %}
 class TopicScheduler
@@ -313,7 +312,17 @@ class TopicScheduler
 end
 {% endhighlight %}
 
+## Conclusions
+
+Learning how to implement a pool of workers in my opinion is like learning any other design patterns. Only when you practice it you really understand the mechanisms and caveats.
+
+If you are leaning a web framework, you hear very often to build the authentication layer from scratch or if you are learning a programming language, the standard library is your friend.
+
+Use complex libraries to solve complex problems but only after have learned the fundamentals.
+
 [threads_and_queues]: /2017/ruby-threads-and-queues
 [celluloid]: https://github.com/celluloid/celluloid
 [concurrent_ruby]: https://github.com/ruby-concurrency/concurrent-ruby
 [fibonacci_wikipedia]: https://en.wikipedia.org/wiki/Fibonacci_number
+[enumerable_cycle]: https://ruby-doc.org/core-2.4.2/Enumerable.html#method-i-cycle
+[topic_exchange_rabbitmq]: https://www.rabbitmq.com/tutorials/tutorial-five-ruby.html
