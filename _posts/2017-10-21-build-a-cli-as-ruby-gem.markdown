@@ -13,11 +13,13 @@ Every developer that is new to Ruby also knows how to `require` a file and/or an
 Today we are going to build a simple weather CLI using plain Ruby with the help of [Bundler][bundler].
 The full project is also available on [GitHub][weather_repo].
 
-First of all let's create a new Gem project boilerplate using Bundler
+First of all let's create a new Gem project boilerplate using Bundler. 
 
 {% highlight bash %}
 bundle gem weather --test=minitest
 {% endhighlight %}
+
+> For more details on how to build and publish a gem to an internal gemserver checkout [my presentation here][bundler_geminabox_presentation].
 
 ## Customise the gemspec
 We need to make initial modifications to `weather.gemspec` file. First, editing any fields marked with a TODO.
@@ -217,6 +219,7 @@ In the past I've used libraries like [Ocra][ocra] to compile command-line tools 
 Ocra is a good solution if the users of your command line tool are not expected to have an installation of Ruby on their environment or if asking the users to install it as dependency is unacceptable. For the rest, building an executable gem is a great, cheap and more maintainable solution.
 
 [bundler]: http://bundler.io
+[bundler_geminabox_presentation]: http://slides.com/fabiopitino/bundler-and-geminabox
 [weather_api_site]: https://openweathermap.org
 [weather_api_key]: https://openweathermap.org/appid
 [weather_repo]: https://github.com/hspazio/weather
