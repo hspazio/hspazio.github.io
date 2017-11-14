@@ -1,25 +1,25 @@
 ---
 layout: post
 title: "Implementing a worker pool"
-date: 2017-11-13
+date: 2017-11-15
 tags: [ruby, concurrency]
 comments: true
 ---
 
-Often in time when you need to execute multiple tasks it pays off running them in parallel, especially when they involve blocking I/O operations and CPU computations.
-It may not always be possible to spawn as many threads as the number of tasks, think about the maximum number of connections allowed to a database server or threads that could use large chunk of memory. 
+Often in time when you need to execute multiple tasks it pays off running them in parallel, especially when they involve blocking I/O operations.
+However, it may not always be possible to spawn as many threads as the number of tasks, think about the maximum number of connections allowed to a database server or threads that could use large chunk of memory. 
 
-In order to improve performance of an application without sacrificing tonnes of resources the Worker Pool is a simple and efficient solution that powers many concurrency patterns.
+In order to improve performance of an application without using tonnes of resources the Worker Pool is a simple and efficient solution that powers many concurrency patterns.
 
-There are a lot of opensource projects that implement this pattern, [Celluloid][celluloid] and [Concurrent Ruby][concurrent_ruby] are the most popular and better maintained ones. But I thought it would be fun to implement one from scratch in order to better understand the dynamics of this pattern.
+There are a lot of opensource projects that implement this pattern, [Celluloid][celluloid] and [Concurrent Ruby][concurrent_ruby] are probably the best solutions. Nonetheless I thought it would be fun to implement one from scratch in order to better understand the dynamics of this pattern.
 
-## The unit: the worker
+## The smallest unit: the worker
 
 A worker is simply a component that pulls work to do from a queue and fulfills it.
 
 The work to be fulfilled could be anything, a `Job` class with a `perform` method - like the popular Delayed Job library - a Ruby block or any arbitrary object. For simplicity here we implement a worker that expects jobs to be any __callable__ object. For callable object we intend any object that implements the `call` method. In our case we can enqueue lambdas which are a perfectly legit callable objects.
 
-We start, using TDD, to define how we would like the worker to behave. When creating multiple workers it could be a good idea to define a `name` or `ID` attribute. It will easy debugging.
+We start, using TDD, to define how we would like the worker to behave. When creating multiple workers it could be a good idea to define a `name` or `ID` attribute. It will ease debugging.
 
 Then the obvious feature: as we queue jobs we expect them to be performed by the worker. To ensure that the jobs have been executed we can collect the results in an array to be inspected during the assertions. Also, as we saw in the [previous post][threads_and_queues], we need to tell the worker when to stop waiting for jobs. We will enqueue the symbol `:done` and we will add an exit condition.
 
@@ -51,7 +51,9 @@ describe Worker do
 end
 {% endhighlight %}
 
-To satisfy the tests we create a `Worker` class that accepts a name and a queue to listen for jobs. Also, as we initialize the object we run it straight away so it starts to listen to jobs. This part is important when we have multiple workers sharing the same queue as if we start all the workers at once while the queue has already been populated we don't guarantee randomization for the jobs scheduling. This is one of the first caveats of building a worker pool. Make sure the workers are running before queuing the jobs.
+To satisfy the tests we create a `Worker` class that accepts a name and a queue to listen for jobs. Also, as we initialize the object we run it straight away so it starts to listen to jobs. This part is important when we have multiple workers sharing the same queue because if we start all the workers at once after the queue has already been populated we don't guarantee randomization for the jobs scheduling. Instead, as we run the first worker it will start pulling jobs from the queue, then we start the second worker and it will pull from the queue, etc. 
+
+This is one of the first caveats of building a worker pool. __Make sure all workers are running before you start to queue jobs__.
 
 {% highlight ruby %}
 class Worker
@@ -79,11 +81,13 @@ class Worker
 end
 {% endhighlight %}
 
-When we initialize the Worker it creates a new Thread that iterates and through the queue and executes each job until it meets the exit condition. Then, with the `join` method we wait for the Worker to complete.
+When we initialize the Worker it creates a new Thread with the work to be performed. At this instant the worker will simply pause on the `while` loop until new items are available in the queue. It will then pull jobs and execute them until it meets the exit condition. 
+
+Then, with the `join` method we wait for the Worker to complete.
 
 ## Managing workers: the worker pool
 
-Now we can move up the abstraction ladder and assemble multiple workers together that share the same queue. The worker pool can be a very thin layer on top of an array of workers.
+Now we can move up the abstraction ladder and assemble multiple workers together that share the same queue. The worker pool can be considered as a very thin layer on top of an array of workers.
 
 As usual we start by writing the tests first. We'll use the [Fibonacci sequence][fibonacci_wikipedia] so we can let the worker pool churning the calculations.
 
@@ -114,7 +118,7 @@ describe WorkerPool do
 end
 {% endhighlight %}
 
-In the test above we defined a `WorkerPool` that initializes 10 workers and we queued 30 lambas to it. Once each lamba is executed by a worker it pushes the result of `fib` to a Hash which is asserted at the end. Then we tell the pool that no more work will be queued and we wait for the workers to fully process the queue.
+In the test above we defined a `WorkerPool` that initializes 10 workers and we queued 30 lambdas to it. Once each lambda is executed by a worker it pushes the result of `fib` to a Hash which is asserted at the end. Then we tell the pool that no more work will be queued and we wait for the workers to fully process the queue.
 
 And for the sake of completeness we define `fib` as below:
 
@@ -202,7 +206,7 @@ In this section we are going to explore some variations to solve different probl
 
 ### Least-Busy First
 
-We modify the previous Worker implementatin by dropping the `queue` argument in the initializer and instead we have the Worker defining a queue internally. This new dedicated queue will be the "inbox" of the Worker. 
+We modify the previous Worker implementation by removing the `queue` argument from the initializer and instead we have the Worker defining a queue internally. This new dedicated queue will be the "inbox" of the Worker. 
 
 Now we need to allow the Worker to receive jobs from the outside - remember previously the worker was pulling from a shared queue. We define a `<<` method that delegates to the inbox queue and a `jobs_count` to let the WorkerPool inspect the load of each worker and schedule jobs by consequence.
 
@@ -244,7 +248,7 @@ class LeastBusyFirstScheduler
 end
 {% endhighlight %}
 
-That's it for this scheduler. A nice, small and single responsibility!
+That's it for this scheduler. A nice and small class with and single responsibility!
 
 We only need to inject it to the WorkerPool constructor so that we can easily switch strategy if we want to. Notice that as the WorkerPool creates the array of workers we can pass in a factory object (just the class in this case) that will be used to initialize the concrete scheduler.
 
@@ -265,6 +269,9 @@ class WorkerPool
 
   # rest of the code...
 end
+
+# used as below
+pool = WorkerPool.new(5, LeastBusyFirstScheduler)
 {% endhighlight %}
 
 There you have! A pool of workers that schedules jobs to the least busy worker.
@@ -285,12 +292,12 @@ class RoundRobinScheduler
 end
 {% endhighlight %}
 
-Notice that differetly than the `LestBusyFirstScheduler`, here we don't need to point to the whole array of workers. We can use the [Enumerable#cycle][enumerable_cycle] method which generates an Enumerator that cycles through the elements of the array and restarts when it reaches the end.
+Notice that differetly than the `LestBusyFirstScheduler`, here we don't need to reference to the whole array of workers. We can use the [Enumerable#cycle][enumerable_cycle] method which generates an Enumerator that cycles through the elements of the array and restarts when it reaches the end.
 
 ### Topic Scheduler
 
-Imagine like on a Pub-Sub system we have workers can only perform jobs with a specific tag. This concept is a simplified version of the [Topic Exchange][topic_exchange_rabbitmq] in RabbitMQ.
-This type of scheduler could be useful if you want to segregate the workers by responsibility - for example mailer workers, file download workers, database workers, etc.
+Imagine like on a Pub-Sub system we have workers can only perform specific jobs. 
+This type of scheduler could be useful if you want to segregate the workers by responsibility - for example: mailer workers, file download workers, database workers, etc.
 
 {% highlight ruby %}
 class TopicScheduler
@@ -312,17 +319,18 @@ class TopicScheduler
 end
 {% endhighlight %}
 
+You could implement the algorithm that best suits your application's needs.
+
 ## Conclusions
 
 Learning how to implement a pool of workers in my opinion is like learning any other design patterns. Only when you practice it you really understand the mechanisms and caveats.
 
-If you are leaning a web framework, you hear very often to build the authentication layer from scratch or if you are learning a programming language, the standard library is your friend.
+If you are learning a web framework, you hear very often that the first time it's better to build the authentication layer from scratch instead of relying on additional libraries, or if you are learning a programming language, the standard library is your friend.
 
-Use complex libraries to solve complex problems but only after have learned the fundamentals.
+Use complex libraries to solve complex problems but only after you have learned the fundamentals.
 
 [threads_and_queues]: /2017/ruby-threads-and-queues
 [celluloid]: https://github.com/celluloid/celluloid
 [concurrent_ruby]: https://github.com/ruby-concurrency/concurrent-ruby
 [fibonacci_wikipedia]: https://en.wikipedia.org/wiki/Fibonacci_number
 [enumerable_cycle]: https://ruby-doc.org/core-2.4.2/Enumerable.html#method-i-cycle
-[topic_exchange_rabbitmq]: https://www.rabbitmq.com/tutorials/tutorial-five-ruby.html
