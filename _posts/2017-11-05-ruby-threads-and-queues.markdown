@@ -198,4 +198,9 @@ end
 
 With this small change our script is now able to exit graceully because there are no more threads hanging around.
 
+__EDIT:__ Thanks to [Jeremy](https://twitter.com/copiousfreetime) for pointing our that since Ruby 2.3.0 we can now use `Queue#close` as exit strategy.
+
+<blockquote class="twitter-tweet" data-lang="en"><p lang="en" dir="ltr"><a href="https://twitter.com/fabiopitino?ref_src=twsrc%5Etfw">@fabiopitino</a> wrt to your Threading posts (which I have enjoyed): Have you seen `Queue#close` from 2.3.0? We no longer need `&lt;&lt; :done` - <a href="https://t.co/nS3ghUroHM">https://t.co/nS3ghUroHM</a></p>&mdash; Jeremy Hinegardner (@copiousfreetime) <a href="https://twitter.com/copiousfreetime/status/932827494863925248?ref_src=twsrc%5Etfw">November 21, 2017</a></blockquote>
+<script async src="https://platform.twitter.com/widgets.js" charset="utf-8"></script>
+
 Regardless whether we have a producer that enqueues a finite number of messages or that runs in a loops and produces messages forever, having an exit strategy for the consumers is always a good practice. For example we could catch the `Ctrl-C` signal and instead of exit immediately we could notify the consumers that we are closing the queue and no more work will be added, then do any teardown or cleanup to exit gracefully.
