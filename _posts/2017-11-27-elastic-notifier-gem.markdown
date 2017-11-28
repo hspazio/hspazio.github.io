@@ -1,23 +1,24 @@
 ---
 layout: post
 title: "Introducing ElasticNotifier"
-date: 2017-11-27
+date: 2017-11-28
 tags: [ruby, elasticsearch, rails]
 comments: true
 ---
 
-ElasticNotifier is a gem that provides a simple API to send error notifications to an [ElasticSearch](https://www.elastic.co/) instance.
+[ElasticNotifier][elastic_notifier_github] is a gem that provides a simple API to send error notifications to an [ElasticSearch](https://www.elastic.co/) instance.
 
 As you rescue errors in your application you can send them to an ElasticSearch index to be used later for analytics, reports and dashboards.
 
-Alternatively, ElasticNotifier is also compatible as a plugin for [exception_notification](https://github.com/smartinez87/exception_notification) gem.
+Alternatively, ElasticNotifier is also compatible to [exception_notification](https://github.com/smartinez87/exception_notification) gem as Notifier plug-in.
 ExceptionNotification is a Rack middleware that intercepts any unhandled errors from a Rails (Sinatra or any other Rack-based applications) and sends sends notifications using various configurable notifiers.
 
 ### Getting started
 
 Add the gem to your application's `Gemfile` and run `bundle` command.
 
-Then we can configure the notifier:
+Configure the notifier:
+
 ```ruby
 NOTIFIER = ElasticNotifier.new(
   url: "http://myserver.com:9200", # default is http://localhost:9200
@@ -49,6 +50,16 @@ ExceptionNotifier.add_notifier :elastic_search, notifier
 
 Now any unhandled failures from your app will result in a document sent to ElasticSearch.
 
+For background processes, you can leverage all registered notifiers (email, Elastic Search, Slack, etc.) with a single command!
+
+```ruby
+begin
+  # some code that raises an exception
+rescue => exception
+  ExceptionNotifier.notify_exception(exception)
+end
+```
+
 ### What information is being sent?
 
 At the time the notifier is invoked it collects some information from the environment, serializes it together with the exception details and sent it to the Elastic instance.
@@ -77,4 +88,7 @@ notifier = ElasticNotifier.new(url: "http://myserver.com:9200", program_name: "c
 
 ### Do you fancy contributing?
 
-Bug reports and PR as well as simple feedback are very welcome! 
+Please get in touch! Bug reports and PR as well as simple feedback are very welcome! 
+The code is available on [GitHub][elastic_notifier_github] and the gem is officially deployed to [Rubygems.org](https://rubygems.org/gems/elastic_notifier).
+
+[elastic_notifier_github]: https://github.com/hspazio/elastic_notifier
