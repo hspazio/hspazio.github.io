@@ -1,17 +1,17 @@
 ---
 layout: post
 title: "Introducing ElasticNotifier"
-date: 2017-11-28
+date: 2017-11-29
 tags: [ruby, elasticsearch, rails]
 comments: true
 ---
 
-[ElasticNotifier][elastic_notifier_github] is a gem that provides a simple API to send error notifications to an [ElasticSearch](https://www.elastic.co/) instance.
+[ElasticNotifier][elastic_notifier_github] is a gem that provides a simple API to send error notifications to an [ElasticSearch](https://www.elastic.co/) server.
 
 As you rescue errors in your application you can send them to an ElasticSearch index to be used later for analytics, reports and dashboards.
 
-Alternatively, ElasticNotifier is also compatible to [exception_notification](https://github.com/smartinez87/exception_notification) gem as Notifier plug-in.
-ExceptionNotification is a Rack middleware that intercepts any unhandled errors from a Rails (Sinatra or any other Rack-based applications) and sends sends notifications using various configurable notifiers.
+Alternatively, ElasticNotifier is also compatible with [exception_notification](https://github.com/smartinez87/exception_notification) gem as a Notifier plug-in.
+ExceptionNotification is a Rack middleware that intercepts any unhandled errors from Rails (Sinatra or any other Rack-based) applications and sends notifications using various configurable notifiers.
 
 ### Getting started
 
@@ -27,7 +27,7 @@ NOTIFIER = ElasticNotifier.new(
 )
 ```
 
-For __Rails__ applications you can add the code above to `config/initializers/elastic_notifier.rb` so it will be available throghout the app.
+For __Rails__ applications you can add the code above to `config/initializers/elastic_notifier.rb` so it will be available throughout the app.
 
 Then send error notifications as you rescue errors:
 
@@ -62,7 +62,7 @@ end
 
 ### What information is being sent?
 
-At the time the notifier is invoked it collects some information from the environment, serializes it together with the exception details and sent it to the Elastic instance.
+At the time the notifier is invoked it collects some information from the environment, serializes it together with the exception details and sends it to the Elastic instance.
 
 ```ruby
 {
