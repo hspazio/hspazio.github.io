@@ -44,7 +44,6 @@ describe Worker do
       queue << :done
     end
 
-    assert_equal [], results
     worker.join
     assert_equal ['received job 1', 'received job 2'], results
   end
