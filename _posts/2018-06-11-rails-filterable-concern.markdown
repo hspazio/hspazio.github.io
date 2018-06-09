@@ -1,14 +1,14 @@
 ---
 layout: post
 title: "Enhanced Filterable concern for Rails models"
-date: 2018-06-07
+date: 2018-06-11
 tags: [ruby, rails, concerns]
 comments: true
 ---
 
 If you have ever tried to filter Rails models via a RESTful controller, you've probably read [Justin Weiss](https://twitter.com/justinweiss)'s great [article][filterable_post] about making models filterable without bloating the controllers. 
 
-I owe him most of the credits for this post because not only did his idea greatly helped to simplify codebases I worked on but it became a must-have Concern for almost all Rails applications I've been working on since. 🙏 Thank you!
+I owe him most of the credits for this post because not only his idea greatly helped simplifying codebases I worked on but it became a must-have Concern for almost all Rails applications I've been working on since. 🙏 Thank you!
 
 The idea is to allow a list of parameters, provided via the controller, to be used for filtering ActiveRecord models. This behavior is defined in a single-purpose `Filterable` concern as below (*Justin's code*):
 
@@ -56,19 +56,19 @@ Every time we wanted to add a new filter to the page we had to:
 
 __It quickly became difficult to maintain the filters__ especially remembering to go through all the 3 steps. 
 
-In all honesty, __step #1__ is hard to miss because it's normally the first behavior to be implemented and it's also the core of the feature.
+In fairness, __step #1__ is hard to miss because it's normally the first behavior to be implemented and it's also the core of the feature.
 
 __Step #3__ might be optional if implementing JSON API or, if in presence of a frontend app, we may have a wireframe and strong user expectations.
 
-__Step #2__, permitting the parameter in the controllers, from my experience, was easy to forget.
+__Step #2__, permitting the parameter in the controllers, for my experience it was easy to forget.
 
 I just found it hard to remember! 😅
 
-I use Test-Driven Development so I always end up having tests in place for the scopes and the view. However, I was not going to create controller tests for each scope we were exposing via the advanced search page. Are these controller tests, which are often slow, really needed?
+I use Test-Driven Development so I always end up having tests for the scopes and the view. However, I was not going to create controller tests for each scope we were exposing via the advanced search page. Are these controller tests (often slow) really needed?
 
 ## What if we could automatically update the permitted filters in the controller?
 
-I wanted the controller to use some sort of class method that provides only the allowed parameters for the searching. I called it `search_params` and I thought we could splat them inside the `params.slice` method in the controller.
+I wanted the controller to use some sort of class method that provides the parameters allowed for the searching. I called it `search_params` and I thought we could splat them inside the `params.slice` method in the controller.
 
 ```ruby
 # app/controllers/posts_controller.rb
@@ -110,7 +110,7 @@ module Filterable
 end
 ```
 
-With this simple change we could easily migrate the model scopes that we wanted to expose via the controller. This was possible by simply changing `scope` with `search_scope`.
+With this simple change we could easily migrate the model scopes that we wanted to expose via the controller by simply changing `scope` with `search_scope`.
 
 ```ruby
 # app/models/post.rb
@@ -132,11 +132,11 @@ end
 
 ## Conclusions
 
-Not only did this enhancement remove any changes in the controllers, it also brought other positive side effects:
+Not only this enhancement removed entirely any maintenance in the controllers, it brought other positive side effects:
 
 1. There was no need to create extra controller tests.
-2. It helped to enforce security as only the search scopes were automatically permitted.
-3. It became a signpost for all other developers as the scope needed to be treated with a certain attention (like prevent SQL injection).
+2. It helped enforcing security as only the search scopes were automatically permitted.
+3. It became a signpost for all other developers as the scope needed to be treated with a certain attention (like prevent SQL injection) as it was a publicly exposed one.
 
 [filterable_gist]: https://gist.github.com/justinweiss/9065666 
 [filterable_post]: https://www.justinweiss.com/articles/search-and-filter-rails-models-without-bloating-your-controller
